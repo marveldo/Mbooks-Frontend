@@ -166,7 +166,7 @@ function Builder() {
           <p className="truncate text-xs text-on-surface-muted">{book.author} · {pages.length} page{pages.length === 1 ? "" : "s"} · {totalWords.toLocaleString()} words</p>
         </div>
         <SaveBadge state={saveState} onRetry={flush} />
-        {pages.length > 0 && <Link href={`/books/${book.id}/read`} className="btn btn-soft btn-sm hidden sm:inline-flex" onClick={() => flush()}>Read</Link>}
+        {pages.length > 0 && <Link href={`/books/${book.id}/read`} className="btn btn-soft btn-sm shrink-0" onClick={() => flush()}>Read</Link>}
         <Link href={`/books/${book.id}`} className="btn btn-soft btn-sm hidden sm:inline-flex" onClick={() => flush()}>View book</Link>
       </header>
 
@@ -301,12 +301,12 @@ function Builder() {
 
 function SaveBadge({ state, onRetry }: { state: SaveState; onRetry: () => void }) {
   if (state === "error") return <button onClick={onRetry} className="chip bg-error text-on-error">Not saved · Retry</button>;
-  const map = { saved: ["Saved", "bg-soft text-on-soft"], unsaved: ["Unsaved changes", "bg-soft text-on-soft"], saving: ["Saving…", "bg-soft text-on-soft"] } as const;
+  const map = { saved: ["Saved", "bg-soft text-on-soft"], unsaved: ["Unsaved", "bg-soft text-on-soft"], saving: ["Saving…", "bg-soft text-on-soft"] } as const;
   const [label, cls] = map[state];
   return (
-    <span className={`chip ${cls}`} aria-live="polite">
+    <span className={`chip shrink-0 whitespace-nowrap ${cls}`} aria-live="polite">
       <span className={`mr-1.5 inline-block h-1.5 w-1.5 rounded-full ${state === "saved" ? "bg-success" : "bg-tertiary"}`} />
-      {label}
+      {label}{state === "unsaved" && <span className="hidden sm:inline">&nbsp;changes</span>}
     </span>
   );
 }
