@@ -1,23 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { AuthCard } from "@/components/AuthCard";
-import { useToast } from "@/components/Toast";
+import { flashToast } from "@/components/Toast";
 
 function LoginForm() {
   const { login, user } = useAuth();
-  const router = useRouter();
-  const toast = useToast();
   const asked = useSearchParams().get("next");
   // Only follow `next` to a path on this site, never to another one ("//evil.example").
   const next = asked && /^\/(?![/\\])/.test(asked) ? asked : "/studio";
 
-  // Already logged in (here or in another tab): this page has nothing to offer.
-  useEffect(() => { if (user) router.replace(next); }, [user, router, next]);
+  // Logged in (just now, or already in another tab): leave with a full page load, not a client-side
+  // navigation. The router may still hold "you're logged out" redirects it fetched for these links
+  // earlier, and following one of those bounces between /login and the destination without arriving.
+  useEffect(() => { if (user) window.location.replace(next); }, [user, next]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,8 +29,8 @@ function LoginForm() {
     setError(null);
     try {
       const u = await login(email.trim(), password);
-      toast.success(`Welcome back, ${u.username}.`, "Your shelves are just as you left them.");
-      router.refresh(); // drop any cached logged-out redirects; the effect above then sends us to `next`
+      // The effect above now reloads into `next`; leave the welcome for that page to show.
+      flashToast("success", `Welcome back, ${u.username}.`, "Your shelves are just as you left them.");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong.");
       setBusy(false);

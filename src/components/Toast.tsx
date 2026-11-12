@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 type Kind = "success" | "error" | "info";
 
@@ -22,6 +22,12 @@ interface ToastApi {
 
 const ToastContext = createContext<ToastApi | null>(null);
 const MAX = 4;
+const FLASH_KEY = "mbooks.flash";
+
+/** Queue a toast for the next full page load (used when logging in, which reloads the app). */
+export function flashToast(kind: Kind, title: string, body?: string) {
+  try { sessionStorage.setItem(FLASH_KEY, JSON.stringify({ kind, title, body })); } catch { /* no storage: skip the toast */ }
+}
 
 const look: Record<Kind, { ribbon: string; ring: string; label: string }> = {
   success: { ribbon: "bg-success", ring: "bg-success text-on-success", label: "Done" },
@@ -43,6 +49,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const item: ToastItem = { id, kind, title, body, duration: kind === "error" ? 7000 : 4500, tilt: id % 2 ? -1.2 : 1 };
     setItems((list) => [...list.slice(-(MAX - 1)), item]);
   }, []);
+
+  // Show a toast left behind by the page we just came from.
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(FLASH_KEY);
+      if (!raw) return;
+      sessionStorage.removeItem(FLASH_KEY);
+      const f = JSON.parse(raw) as { kind: Kind; title: string; body?: string };
+      if (f.title && f.kind in look) push(f.kind, f.title, f.body);
+    } catch { /* nothing to show */ }
+  }, [push]);
 
   const api = useMemo<ToastApi>(() => ({
     success: (t, b) => push("success", t, b),

@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { AuthCard } from "@/components/AuthCard";
-import { useToast } from "@/components/Toast";
+import { flashToast } from "@/components/Toast";
 
 function passwordProblem(pw: string): string | null {
   if (pw.length < 8) return "At least 8 characters.";
@@ -18,11 +17,10 @@ function passwordProblem(pw: string): string | null {
 
 export default function SignupPage() {
   const { login, user } = useAuth();
-  const router = useRouter();
-  const toast = useToast();
 
-  // Already logged in (or just signed up): off to the studio.
-  useEffect(() => { if (user) router.replace("/studio"); }, [user, router]);
+  // Logged in (just signed up, or already in another tab): off to the studio with a full page load.
+  // A client-side navigation can follow a stale "you're logged out" redirect and never arrive.
+  useEffect(() => { if (user) window.location.replace("/studio"); }, [user]);
   const [form, setForm] = useState({ username: "", email: "", password: "" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -40,8 +38,8 @@ export default function SignupPage() {
     try {
       await api.signup(form.username.trim(), form.email.trim(), form.password);
       const u = await login(form.email.trim(), form.password);
-      toast.success(`Glad you're here, ${u.username}.`, "Your account is ready. Time to fill a shelf.");
-      router.refresh(); // the effect above then sends us to the studio
+      // The effect above now reloads into the studio; leave the welcome for that page to show.
+      flashToast("success", `Glad you're here, ${u.username}.`, "Your account is ready. Time to fill a shelf.");
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.fieldErrors());
