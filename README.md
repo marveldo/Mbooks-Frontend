@@ -60,3 +60,18 @@ Orders can only be removed when they have no payment, or only failed ones (the A
 The `/payments` receipt lists every attempt, but **Total paid** only counts `success`. Times from the API are UTC and are shown in the reader's local time (`formatDateTime` in `src/lib/api.ts`).
 
 On the backend, set `PAYSTACK_SECRET_KEY`, and in the Paystack dashboard point the webhook at `<backend>/api/v1/payments/webhook`. See the backend's `/docs` for the full API.
+
+## Catalog, library and infinite scroll
+
+- **Catalog** (home page, `#catalog`): `GET /books` with search (`q`, title or author), sort and a naira price range. Typing is applied 300 ms after the last keystroke.
+- **My library** (`/library`): `GET /me/books` with the same filters plus a shelf: *All my books*, *Bought* or *Written by me*. Books you wrote get a *Written by you* badge and an *Open builder* link.
+- **My studio** (`/studio`): the *Written* shelf, opening the builder.
+- **Access checks:** the book page and the reader call `GET /me/books/{id}` (`api.inLibrary`), so they no longer download the whole library.
+
+All three lists use `useInfiniteBooks` (`src/lib/useInfiniteBooks.ts`) and `InfiniteBookGrid`:
+- page 1 loads first, and the next page loads when the end of the grid comes within 800px of the screen;
+- loading stops when the API says `has_more: false`;
+- changing a filter starts again from page 1, and answers for older filters are thrown away;
+- if loading fails, *Try again* appears, and a *Load more* button is the fallback if scrolling doesn't trigger.
+
+The filters bar is `BookFiltersBar`.

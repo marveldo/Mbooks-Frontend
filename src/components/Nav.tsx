@@ -12,9 +12,10 @@ import type { Theme } from "@/lib/api";
 /** Everything a logged-in person can reach. Lives in the profile menu, not the navbar. */
 const MENU: { href: string; label: string; hint: string; icon: React.ReactNode }[] = [
   { href: "/books/new", label: "New book", hint: "Start writing", icon: <path d="M10 4v12M4 10h12" /> },
-  { href: "/studio", label: "My studio", hint: "Books you write and own", icon: <path d="M10 5.5C8 3.8 5 3.8 2.5 4.5v10c2.5-.7 5.5-.7 7.5 1 2-1.7 5-1.7 7.5-1v-10c-2.5-.7-5.5-.7-7.5 1zM10 5.5v10" /> },
+  { href: "/library", label: "My library", hint: "Books you bought or wrote", icon: <path d="M4 3.5v13M7.5 3.5v13M11 4.2l3.6 12.1M2.5 16.5h15" /> },
+  { href: "/studio", label: "My studio", hint: "Books you're writing", icon: <path d="M10 5.5C8 3.8 5 3.8 2.5 4.5v10c2.5-.7 5.5-.7 7.5 1 2-1.7 5-1.7 7.5-1v-10c-2.5-.7-5.5-.7-7.5 1zM10 5.5v10" /> },
   { href: "/orders", label: "Orders", hint: "What you've ordered", icon: <path d="M4 6.5h12l-1 9.5H5zM7 6.5V5a3 3 0 016 0v1.5" /> },
-  { href: "/payments", label: "Payments", hint: "Receipts", icon: <path d="M5 2.5h10v15l-2.5-1.5L10 17.5 7.5 16 5 17.5zM7.5 7h5M7.5 10.5h5" /> },
+  { href: "/payments", label: "Payments", hint: "Your payments", icon: <path d="M5 2.5h10v15l-2.5-1.5L10 17.5 7.5 16 5 17.5zM7.5 7h5M7.5 10.5h5" /> },
   { href: "/settings", label: "Settings", hint: "Account and preferences", icon: <path d="M3 6h7M14 6h3M3 14h3M10 14h7M12 4v4M8 12v4" /> },
 ];
 

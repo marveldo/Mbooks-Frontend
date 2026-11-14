@@ -1,34 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { api, type Book } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { useCallback, useState } from "react";
+import { api, type BookFilters } from "@/lib/api";
+import { useInfiniteBooks } from "@/lib/useInfiniteBooks";
 import { RequireAuth } from "@/components/RequireAuth";
-import { BookCard, BookGridSkeleton } from "@/components/BookCard";
-
-/** The API has no "books I created" endpoint, so we page through the catalog and filter by owner. */
-async function booksOwnedBy(userId: string): Promise<Book[]> {
-  const out: Book[] = [];
-  for (let p = 1; p <= 50; p++) {
-    const batch = await api.listBooks(p, 100);
-    out.push(...batch.filter((b) => b.owner_id === userId));
-    if (batch.length < 100) break;
-  }
-  return out;
-}
+import { BookCard } from "@/components/BookCard";
+import { BookFiltersBar, hasFilters } from "@/components/BookFiltersBar";
+import { InfiniteBookGrid } from "@/components/InfiniteBookGrid";
 
 function Studio() {
-  const { user } = useAuth();
-  const [mine, setMine] = useState<Book[] | null>(null);
-  const [library, setLibrary] = useState<Book[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<BookFilters>({});
+  const [resets, setResets] = useState(0);
+  const clearFilters = () => { setFilters({}); setResets((n) => n + 1); };
 
-  useEffect(() => {
-    if (!user) return;
-    booksOwnedBy(user.id).then(setMine).catch((e) => setError(e.message));
-    api.myLibrary().then(setLibrary).catch(() => setLibrary([]));
-  }, [user]);
+  const fetchPage = useCallback((page: number) => api.myLibrary({ ...filters, shelf: "written" }, page, 24), [filters]);
+  const mine = useInfiniteBooks(fetchPage, JSON.stringify(filters));
+  const filtered = hasFilters(filters);
+  const nothingYet = !filtered && mine.books?.length === 0;
 
   return (
     <div className="mx-auto max-w-[1200px] px-4 pt-12 sm:px-6 md:pt-16">
@@ -42,48 +31,39 @@ function Studio() {
       </div>
 
       <section className="mt-10">
-        {error && <div className="alert-error">{error}</div>}
-        {!error && mine === null && <BookGridSkeleton count={4} />}
-        {mine?.length === 0 && (
-          <div className="note mx-auto max-w-lg -rotate-1 text-center">
-            <p className="headline-sm">Your shelf is empty</p>
-            <p className="mt-2 text-sm">Every book starts with a title. Make one and the builder opens straight away.</p>
-            <Link href="/books/new" className="btn btn-primary mt-5">Start a new book</Link>
-          </div>
-        )}
-        {mine && mine.length > 0 && (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-12 md:grid-cols-3 lg:grid-cols-4">
-            {mine.map((b) => (
-              <div key={b.id}>
-                <BookCard book={b} href={`/books/${b.id}/build`} />
-                <div className="mt-3 flex gap-4 text-sm">
-                  <Link href={`/books/${b.id}/build`} className="btn-link">Open builder</Link>
-                  <Link href={`/books/${b.id}/read`} className="btn-link">Read</Link>
-                  <Link href={`/books/${b.id}`} className="btn-link">View</Link>
-                </div>
+        {!nothingYet && <BookFiltersBar key={resets} value={filters} onChange={setFilters} placeholder="Search your books" />}
+        <InfiniteBookGrid
+          state={mine}
+          render={(b) => (
+            <div key={b.id}>
+              <BookCard book={b} href={`/books/${b.id}/build`} />
+              <div className="mt-3 flex gap-4 text-sm">
+                <Link href={`/books/${b.id}/build`} className="btn-link">Open builder</Link>
+                <Link href={`/books/${b.id}/read`} className="btn-link">Read</Link>
+                <Link href={`/books/${b.id}`} className="btn-link">View</Link>
               </div>
-            ))}
-          </div>
-        )}
+            </div>
+          )}
+          empty={
+            filtered ? (
+              <div className="note mx-auto max-w-lg -rotate-1 text-center">
+                <p className="headline-sm">None of your books match</p>
+                <button className="btn btn-soft mt-5" onClick={clearFilters}>Clear the filters</button>
+              </div>
+            ) : (
+              <div className="note mx-auto max-w-lg -rotate-1 text-center">
+                <p className="headline-sm">Your shelf is empty</p>
+                <p className="mt-2 text-sm">Every book starts with a title. Make one and the builder opens straight away.</p>
+                <Link href="/books/new" className="btn btn-primary mt-5">Start a new book</Link>
+              </div>
+            )
+          }
+        />
       </section>
 
-      {library && library.length > 0 && (
-        <section className="mt-24">
-          <p className="eyebrow">Library</p>
-          <h2 className="headline-md mt-2 mb-8">Books you&apos;ve bought</h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-12 md:grid-cols-3 lg:grid-cols-4">
-            {library.map((b) => (
-              <div key={b.id}>
-                <BookCard book={b} href={`/books/${b.id}/read`} />
-                <div className="mt-3 flex gap-4 text-sm">
-                  <Link href={`/books/${b.id}/read`} className="btn-link">Read</Link>
-                  <Link href={`/books/${b.id}`} className="btn-link">Details</Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      <p className="mt-20 text-center text-sm">
+        Looking for books you&apos;ve bought? <Link href="/library" className="btn-link">Open your library →</Link>
+      </p>
     </div>
   );
 }

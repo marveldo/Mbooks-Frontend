@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { api, type Book } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { api, type Book, type BookFilters } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { BookCard, BookGridSkeleton } from "@/components/BookCard";
+import { useInfiniteBooks } from "@/lib/useInfiniteBooks";
+import { BookCard } from "@/components/BookCard";
 import { BookCover } from "@/components/BookCover";
+import { BookFiltersBar, hasFilters } from "@/components/BookFiltersBar";
+import { InfiniteBookGrid } from "@/components/InfiniteBookGrid";
 
 const PER_PAGE = 24;
 
@@ -26,18 +29,23 @@ const STEPS = [
 
 export default function Home() {
   const { user } = useAuth();
-  const [books, setBooks] = useState<Book[] | null>(null);
-  const [page, setPage] = useState(1);
-  const [error, setError] = useState<string | null>(null);
+  const [filters, setFilters] = useState<BookFilters>({});
+  const [resets, setResets] = useState(0); // remounts the filter bar so its typed text clears too
+  const clearFilters = () => { setFilters({}); setResets((n) => n + 1); };
+  const [featured, setFeatured] = useState<Book[] | null>(null);
 
+  const fetchPage = useCallback((page: number) => api.listBooks(filters, page, PER_PAGE), [filters]);
+  const catalog = useInfiniteBooks(fetchPage, JSON.stringify(filters));
+
+  // The three newest books for the hero, whatever the catalog below is filtered by.
   useEffect(() => {
-    setBooks(null);
-    setError(null);
-    api.listBooks(page, PER_PAGE).then(setBooks).catch((e) => setError(e.message));
-  }, [page]);
+    api.listBooks({}, 1, 3).then((r) => setFeatured(r.books)).catch(() => setFeatured([]));
+  }, []);
 
   const publishHref = user ? "/books/new" : "/signup";
-  const fan = books && books.length >= 3 && page === 1 ? books.slice(0, 3) : null;
+  const fan = featured && featured.length >= 3 ? featured : null;
+  const filtered = hasFilters(filters);
+  const shelfIsEmpty = !filtered && catalog.books?.length === 0;
 
   return (
     <>
@@ -131,17 +139,16 @@ export default function Home() {
             <p className="eyebrow">№ 01 · The catalog</p>
             <h2 className="headline-lg mt-2 !text-[clamp(36px,5vw,56px)]">New on the shelves</h2>
           </div>
-          {books && books.length > 0 && (
+          {catalog.books && catalog.total > 0 && (
             <p className="font-display text-lg text-on-surface-muted italic">
-              {books.length}{books.length === PER_PAGE ? "+" : ""} {books.length === 1 ? "title" : "titles"}{page > 1 ? `, page ${page}` : ""}
+              {catalog.total} {catalog.total === 1 ? "title" : "titles"}{filtered ? " found" : ""}
             </p>
           )}
         </div>
 
-        {error && <div className="alert-error">{error}</div>}
-        {!error && books === null && <BookGridSkeleton />}
+        {!shelfIsEmpty && <BookFiltersBar key={resets} value={filters} onChange={setFilters} />}
 
-        {books && books.length === 0 && page === 1 && (
+        {shelfIsEmpty ? (
           <div className="relative overflow-hidden rounded-[12px] border border-dashed border-neutral/60 px-6 py-16 text-center">
             {/* empty shelf */}
             <div className="mx-auto mb-8 flex h-24 max-w-sm items-end justify-center gap-1.5 border-b-[6px] border-on-surface/80" aria-hidden>
@@ -154,20 +161,18 @@ export default function Home() {
             <p className="mx-auto mt-3 max-w-md text-on-surface-muted">Nobody has published here yet. The first book in the catalog could be yours.</p>
             <Link href={publishHref} className="btn btn-primary mt-7">Publish the first book</Link>
           </div>
-        )}
-
-        {books && books.length > 0 && (
-          <div className="grid grid-cols-2 gap-x-6 gap-y-14 md:grid-cols-3 md:gap-x-10 lg:grid-cols-4">
-            {books.map((b, i) => <BookCard key={b.id} book={b} index={(page - 1) * PER_PAGE + i} />)}
-          </div>
-        )}
-
-        {books && (page > 1 || books.length === PER_PAGE) && (
-          <div className="mt-14 flex items-center justify-center gap-3">
-            <button className="btn btn-soft btn-sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>← Previous</button>
-            <span className="px-3 font-display text-lg italic">Page {page}</span>
-            <button className="btn btn-soft btn-sm" disabled={books.length < PER_PAGE} onClick={() => setPage((p) => p + 1)}>Next →</button>
-          </div>
+        ) : (
+          <InfiniteBookGrid
+            state={catalog}
+            render={(b, i) => <BookCard key={b.id} book={b} index={i} />}
+            empty={
+              <div className="note mx-auto max-w-md -rotate-1 text-center">
+                <p className="headline-sm">No books match that</p>
+                <p className="mt-2 text-sm">Try fewer words, or widen the price range.</p>
+                <button className="btn btn-soft mt-5" onClick={clearFilters}>Clear the filters</button>
+              </div>
+            }
+          />
         )}
       </section>
 

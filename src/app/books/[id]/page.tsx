@@ -23,7 +23,7 @@ export default function BookPage() {
   // Is this book already in the reader's library?
   useEffect(() => {
     if (!user) { setOwned(false); return; }
-    api.myLibrary().then((books) => setOwned(books.some((b) => b.id === id))).catch(() => {});
+    api.inLibrary(id).then(setOwned);
   }, [user, id]);
 
   async function buy() {

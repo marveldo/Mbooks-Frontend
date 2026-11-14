@@ -27,6 +27,40 @@ export interface Book {
   updated_at: string;
 }
 
+export type BookSort = "newest" | "oldest" | "title" | "price_asc" | "price_desc";
+
+/** Which books in your library: ones you bought, ones you wrote, or both. */
+export type Shelf = "all" | "bought" | "written";
+
+/** Filters for GET /books and GET /me/books. Prices are in naira. */
+export interface BookFilters {
+  /** Title or author contains this (any case). */
+  q?: string;
+  author?: string;
+  min_price?: number;
+  max_price?: number;
+  sort?: BookSort;
+}
+
+export interface BookList {
+  books: Book[];
+  total: number;
+  page: number;
+  per_page: number;
+  has_more: boolean;
+}
+
+/** "?a=1&b=x" from the set (non-empty) values. */
+function queryString(params: Record<string, string | number | undefined | null>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === "" || (typeof v === "number" && Number.isNaN(v))) continue;
+    q.set(k, String(v));
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
+}
+
 export interface BookInput {
   title?: string;
   author?: string;
@@ -245,12 +279,20 @@ export const api = {
   signup: (username: string, email: string, password: string) =>
     request<User>("POST", "/users", { username, email, password }),
 
-  listBooks: (page = 1, perPage = 24) => request<Book[]>("GET", `/books?page=${page}&per_page=${perPage}`),
+  /** The catalog: one page of books matching the filters, plus the total. */
+  listBooks: (filters: BookFilters = {}, page = 1, perPage = 24) =>
+    request<BookList>("GET", `/books${queryString({ ...filters, page, per_page: perPage })}`),
   getBook: (id: string) => request<Book>("GET", `/books/${id}`),
   createBook: (input: BookInput) => request<Book>("POST", "/books", clean(input)),
   updateBook: (id: string, input: BookInput) => request<Book>("PUT", `/books/${id}`, clean(input)),
   deleteBook: (id: string) => request<null>("DELETE", `/books/${id}`),
-  myLibrary: () => request<Book[]>("GET", "/me/books"),
+  /** Your library: books you bought and/or wrote (`shelf`), with the same filters as the catalog. */
+  myLibrary: (filters: BookFilters & { shelf?: Shelf } = {}, page = 1, perPage = 24) =>
+    request<BookList>("GET", `/me/books${queryString({ ...filters, page, per_page: perPage })}`),
+  /** The book if it's in your library (bought or written); a 404 ApiError otherwise. */
+  libraryBook: (id: string) => request<Book>("GET", `/me/books/${id}`),
+  /** Is this book in your library? */
+  inLibrary: (id: string) => api.libraryBook(id).then(() => true, () => false),
 
   // Account
   updateUser: (id: string, input: { username?: string; email?: string }) => request<User>("PUT", `/users/${id}`, input),

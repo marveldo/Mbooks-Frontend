@@ -115,7 +115,7 @@ function Reader() {
         if (off) return;
         setBook(b);
         let ok = role === "ADMIN" || (!!uid && uid === b.owner_id);
-        if (!ok) ok = (await api.myLibrary()).some((x) => x.id === id);
+        if (!ok) ok = await api.inLibrary(id);
         if (off) return;
         setAccess(ok ? "yes" : "no");
         if (!ok) return;
