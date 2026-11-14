@@ -118,6 +118,7 @@ body {
   .chip { display: inline-flex; align-items: center; border-radius: 9999px; padding: 4px 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.04em; background: var(--color-soft); color: var(--color-on-soft); }
   .chip-accent { background: var(--color-tertiary); color: var(--color-on-tertiary); }
   .chip-success { background: var(--color-success); color: var(--color-on-success); }
+  .chip-error { background: var(--color-error); color: var(--color-on-error); }
 
   .alert-error { background: var(--color-error); color: var(--color-on-error); border-radius: var(--radius-md); padding: 16px; font-size: 14px; line-height: 1.5; }
 }

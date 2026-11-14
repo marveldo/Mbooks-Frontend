@@ -125,11 +125,36 @@ export interface Order {
   total_price: number;
 }
 
+/**
+ * pending: waiting for the customer or the bank. success: paid, the book is in the library.
+ * failed: Paystack declined it. abandoned: never confirmed after the server's last automatic check.
+ * refund_pending / refunding / refunded: money was taken that's being returned (paid after the checkout
+ * was abandoned, the wrong amount, or the order was already paid). refund_failed: will be refunded by hand.
+ */
+export type PaymentStatus =
+  | "pending" | "success" | "failed" | "abandoned"
+  | "refund_pending" | "refunding" | "refunded" | "refund_failed";
+
 export interface Payment {
   id: string;
   user_id: string;
   order_id: string;
   amount: number;
+  currency: string;
+  /** Paystack reference. Null for payments made before Paystack was added. */
+  reference: string | null;
+  status: PaymentStatus;
+  /** The Paystack checkout page, only while the payment is pending. */
+  checkout_url: string | null;
+  created_at: string;
+  paid_at: string | null;
+}
+
+/** POST /orders/{id}/pay: send the customer to `authorization_url`. */
+export interface Checkout {
+  reference: string;
+  authorization_url: string;
+  status: "pending";
 }
 
 export type Theme = "light" | "dark" | "system";
@@ -240,7 +265,10 @@ export const api = {
   orders: () => request<Order[]>("GET", "/orders"),
   createOrder: (book_id: string, quantity = 1) => request<Order>("POST", "/orders", { book_id, quantity }),
   deleteOrder: (id: string) => request<null>("DELETE", `/orders/${id}`),
-  payOrder: (id: string) => request<Payment>("POST", `/orders/${id}/pay`),
+  /** Starts (or reuses) a Paystack checkout. Paystack sends the customer back to `callback_url` with ?reference=… */
+  payOrder: (id: string, callback_url: string) => request<Checkout>("POST", `/orders/${id}/pay`, { callback_url }),
+  /** Asks the server to confirm the payment with Paystack. Safe to call repeatedly. */
+  verifyPayment: (reference: string) => request<Payment>("POST", `/payments/${encodeURIComponent(reference)}/verify`),
   payments: () => request<Payment[]>("GET", "/payments"),
 
   coverSignature: () => request<CoverSignature>("POST", "/books/cover-signature"),
@@ -343,6 +371,14 @@ export function watchJob(jobId: string, onStatus: (s: JobStatus) => void): () =>
 }
 
 export const EMPTY_DOC = JSON.stringify({ type: "doc", content: [{ type: "paragraph" }] });
+
+/** The API sends times as "2026-11-14 09:21:20.123456" in UTC. */
+export function formatDateTime(value: string | null | undefined) {
+  if (!value) return "";
+  const iso = value.trim().replace(" ", "T").replace(/(\.\d{3})\d+/, "$1");
+  const d = new Date(/([zZ]|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`);
+  return Number.isNaN(d.getTime()) ? value : new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(d);
+}
 
 export function formatPrice(n: number) {
   return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 2 }).format(n);

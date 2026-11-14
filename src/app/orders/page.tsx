@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, formatPrice, type Order } from "@/lib/api";
-import { loadPurchases, ref, type Purchases } from "@/lib/purchases";
+import { goToCheckout, loadPurchases, ref, STATUS, type Purchases } from "@/lib/purchases";
 import { RequireAuth } from "@/components/RequireAuth";
 import { BookCover } from "@/components/BookCover";
 import { useToast } from "@/components/Toast";
@@ -13,20 +13,19 @@ function Orders() {
   const [data, setData] = useState<Purchases | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null); // order id being paid or removed
+  const [leaving, setLeaving] = useState(false); // on our way to Paystack
 
   const load = useCallback(() => loadPurchases().then(setData).catch((e) => setError(e.message)), []);
   useEffect(() => { load(); }, [load]);
 
-  async function pay(o: Order, title: string) {
+  async function pay(o: Order) {
     setBusy(o.id);
     try {
-      await api.payOrder(o.id);
-      toast.success("Payment received", `“${title}” is now in your library.`);
-      await load();
+      await goToCheckout(o.id);
+      setLeaving(true); // the page is unloading; keep the button disabled
     } catch (e) {
-      toast.error("Payment didn't go through", e instanceof ApiError ? (e.status === 409 ? "This order has already been paid." : e.message) : undefined);
+      toast.error("Couldn't open the payment page", e instanceof ApiError ? (e.status === 409 ? "This order has already been paid." : e.message) : undefined);
       if (e instanceof ApiError && e.status === 409) await load();
-    } finally {
       setBusy(null);
     }
   }
@@ -39,7 +38,8 @@ function Orders() {
       toast.info("Order removed");
       await load();
     } catch (e) {
-      toast.error("Couldn't remove the order", e instanceof ApiError ? (e.status === 409 ? "Paid orders can't be removed." : e.message) : undefined);
+      toast.error("Couldn't remove the order", e instanceof ApiError ? e.message : undefined);
+      if (e instanceof ApiError && e.status === 409) await load();
     } finally {
       setBusy(null);
     }
@@ -54,7 +54,7 @@ function Orders() {
       <div className="rule-double flex flex-wrap items-end justify-between gap-6 pt-6">
         <div>
           <h1 className="headline-lg">Orders</h1>
-          <p className="mt-2 text-on-surface-muted">Pay for an order and the book goes straight into your library.</p>
+          <p className="mt-2 text-on-surface-muted">Pay securely with Paystack. Once it&apos;s confirmed, the book goes straight into your library.</p>
         </div>
         {data && data.orders.length > 0 && (
           <dl className="flex gap-8 text-right">
@@ -82,6 +82,10 @@ function Orders() {
             {list.map((o) => {
               const book = data!.books[o.book_id];
               const isPaid = !!data!.paidBy[o.id];
+              const latest = data!.latestBy[o.id];
+              const pending = latest?.status === "pending";
+              const canRemove = data!.removable.has(o.id);
+              const working = busy === o.id || leaving;
               const name = book?.title ?? "A book that's no longer listed";
               return (
                 <li key={o.id} className="card flex flex-wrap items-center gap-5 p-4 sm:flex-nowrap sm:p-5">
@@ -94,15 +98,28 @@ function Orders() {
                     <p className="text-sm text-on-surface-muted">
                       {book?.author ? `${book.author} · ` : ""}{o.quantity} {o.quantity === 1 ? "copy" : "copies"}
                     </p>
+                    {!isPaid && latest && (
+                      <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-on-surface-muted">
+                        <span className={STATUS[latest.status].chip}>{STATUS[latest.status].label}</span>
+                        <span>{STATUS[latest.status].note}</span>
+                      </p>
+                    )}
                   </div>
                   <div className="flex w-full items-center justify-between gap-4 sm:w-auto sm:flex-col sm:items-end sm:gap-2">
                     <span className="font-display text-2xl font-medium">{formatPrice(o.total_price)}</span>
                     {isPaid ? (
                       <span className="chip chip-success">Paid · in your library</span>
                     ) : (
-                      <div className="flex items-center gap-3">
-                        <button className="text-sm font-semibold text-on-surface-muted hover:text-error hover:underline" disabled={busy === o.id} onClick={() => remove(o)}>Remove</button>
-                        <button className="btn btn-primary btn-sm" disabled={busy === o.id} onClick={() => pay(o, name)}>{busy === o.id ? "Working…" : "Pay now"}</button>
+                      <div className="flex flex-wrap items-center justify-end gap-3">
+                        {canRemove && (
+                          <button className="text-sm font-semibold text-on-surface-muted hover:text-error hover:underline" disabled={working} onClick={() => remove(o)}>Remove</button>
+                        )}
+                        {pending && latest.reference && (
+                          <Link href={`/payments/callback?reference=${encodeURIComponent(latest.reference)}`} className="text-sm font-semibold text-secondary hover:underline">Already paid? Check</Link>
+                        )}
+                        <button className="btn btn-primary btn-sm" disabled={working} onClick={() => pay(o)}>
+                          {busy === o.id ? "Opening Paystack…" : pending ? "Continue payment" : "Pay now"}
+                        </button>
                       </div>
                     )}
                   </div>
@@ -113,7 +130,7 @@ function Orders() {
         </section>
       ))}
 
-      {paid.length > 0 && <p className="mt-10 text-center text-sm"><Link href="/payments" className="btn-link">See your receipts →</Link></p>}
+      {paid.length > 0 && <p className="mt-10 text-center text-sm"><Link href="/payments" className="btn-link">See your payments →</Link></p>}
     </div>
   );
 }
