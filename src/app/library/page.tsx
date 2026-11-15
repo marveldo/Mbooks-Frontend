@@ -13,8 +13,8 @@ import { InfiniteBookGrid } from "@/components/InfiniteBookGrid";
 const PER_PAGE = 24;
 
 const SHELVES: { value: Shelf; label: string; empty: string; cta: { href: string; label: string } }[] = [
-  { value: "all", label: "All my books", empty: "Books you buy or write end up here.", cta: { href: "/#catalog", label: "Browse the catalog" } },
-  { value: "bought", label: "Bought", empty: "Books you pay for land here, ready to read.", cta: { href: "/#catalog", label: "Browse the catalog" } },
+  { value: "all", label: "All my books", empty: "Books you buy or write end up here.", cta: { href: "/books", label: "Browse the catalog" } },
+  { value: "bought", label: "Bought", empty: "Books you pay for land here, ready to read.", cta: { href: "/books", label: "Browse the catalog" } },
   { value: "written", label: "Written by me", empty: "Books you create show up here.", cta: { href: "/books/new", label: "Start a new book" } },
 ];
 

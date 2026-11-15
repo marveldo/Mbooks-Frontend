@@ -71,7 +71,7 @@ function Orders() {
         <div className="note mx-auto mt-14 max-w-md -rotate-1 text-center">
           <p className="headline-sm">Nothing ordered yet</p>
           <p className="mt-2 text-sm">Find a book you like in the catalog and it will show up here.</p>
-          <Link href="/#catalog" className="btn btn-primary mt-5">Browse the catalog</Link>
+          <Link href="/books" className="btn btn-primary mt-5">Browse the catalog</Link>
         </div>
       )}
 

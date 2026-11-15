@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import { api, type Book, type BookFilters } from "@/lib/api";
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { api, type Book, type BookList } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { useInfiniteBooks } from "@/lib/useInfiniteBooks";
-import { BookCard } from "@/components/BookCard";
+import { BookCard, BookGridSkeleton } from "@/components/BookCard";
 import { BookCover } from "@/components/BookCover";
-import { BookFiltersBar, hasFilters } from "@/components/BookFiltersBar";
-import { InfiniteBookGrid } from "@/components/InfiniteBookGrid";
+import { Pager } from "@/components/Pager";
 
-const PER_PAGE = 24;
+/** Two rows of books: 4 across from tablet width up, 2 across on phones. */
+const WIDE = "(min-width: 768px)";
+const perPageNow = () => (typeof window !== "undefined" && !window.matchMedia(WIDE).matches ? 4 : 8);
 
 // Shown in the hero while the shelves are empty: an invitation, not pretend stock.
 const INVITES = [
@@ -29,23 +30,58 @@ const STEPS = [
 
 export default function Home() {
   const { user } = useAuth();
-  const [filters, setFilters] = useState<BookFilters>({});
-  const [resets, setResets] = useState(0); // remounts the filter bar so its typed text clears too
-  const clearFilters = () => { setFilters({}); setResets((n) => n + 1); };
+  const router = useRouter();
   const [featured, setFeatured] = useState<Book[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(8);
+  const [list, setList] = useState<BookList | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [attempt, setAttempt] = useState(0); // bumped by "Try again"
+  const catalogRef = useRef<HTMLElement>(null);
 
-  const fetchPage = useCallback((page: number) => api.listBooks(filters, page, PER_PAGE), [filters]);
-  const catalog = useInfiniteBooks(fetchPage, JSON.stringify(filters));
-
-  // The three newest books for the hero, whatever the catalog below is filtered by.
+  // The three newest books for the hero.
   useEffect(() => {
     api.listBooks({}, 1, 3).then((r) => setFeatured(r.books)).catch(() => setFeatured([]));
   }, []);
 
+  // Keep it to two rows: 8 books on wide screens, 4 on phones. Back to page 1 when that changes.
+  useEffect(() => {
+    const media = window.matchMedia(WIDE);
+    const update = () => { setPerPage(perPageNow()); setPage(1); };
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  // "New on the shelves": one page of the newest books at a time.
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    api.listBooks({}, page, perPage)
+      .then((r) => { if (!cancelled) setList(r); })
+      .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : "Couldn't load the books."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [page, perPage, attempt]);
+
+  function goToPage(n: number) {
+    setPage(n);
+    catalogRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function searchAll(e: React.FormEvent) {
+    e.preventDefault();
+    const q = search.trim();
+    router.push(q ? `/books?q=${encodeURIComponent(q)}` : "/books");
+  }
+
   const publishHref = user ? "/books/new" : "/signup";
   const fan = featured && featured.length >= 3 ? featured : null;
-  const filtered = hasFilters(filters);
-  const shelfIsEmpty = !filtered && catalog.books?.length === 0;
+  const pages = list ? Math.max(1, Math.ceil(list.total / perPage)) : 1;
+  const shelfIsEmpty = list?.total === 0;
 
   return (
     <>
@@ -71,7 +107,7 @@ export default function Home() {
             Browse the catalog and keep every book you buy. Or pull up a chair and write your own, page by page.
           </p>
           <div className="rise mt-9 flex flex-wrap items-center gap-x-6 gap-y-3" style={{ animationDelay: "240ms" }}>
-            <a href="#catalog" className="btn btn-primary">Browse the catalog</a>
+            <Link href="/books" className="btn btn-primary">Browse the catalog</Link>
             <Link href={publishHref} className="group inline-flex items-center gap-2 font-bold text-secondary">
               <span className="underline decoration-2 underline-offset-4">Publish a book</span>
               <span className="transition-transform group-hover:translate-x-1">→</span>
@@ -133,20 +169,35 @@ export default function Home() {
       </div>
 
       {/* ---------- Catalog ---------- */}
-      <section id="catalog" className="mx-auto max-w-[1200px] scroll-mt-24 px-4 pt-24 sm:px-6">
+      <section id="catalog" ref={catalogRef} className="mx-auto max-w-[1200px] scroll-mt-24 px-4 pt-24 sm:px-6">
         <div className="rule-double mb-12 flex flex-wrap items-end justify-between gap-4 pt-6">
           <div>
             <p className="eyebrow">№ 01 · The catalog</p>
             <h2 className="headline-lg mt-2 !text-[clamp(36px,5vw,56px)]">New on the shelves</h2>
           </div>
-          {catalog.books && catalog.total > 0 && (
+          {list && list.total > 0 && (
             <p className="font-display text-lg text-on-surface-muted italic">
-              {catalog.total} {catalog.total === 1 ? "title" : "titles"}{filtered ? " found" : ""}
+              {list.total} {list.total === 1 ? "title" : "titles"}{pages > 1 ? ` · page ${page} of ${pages}` : ""}
             </p>
           )}
         </div>
 
-        {!shelfIsEmpty && <BookFiltersBar key={resets} value={filters} onChange={setFilters} />}
+        {!shelfIsEmpty && (
+          <form onSubmit={searchAll} role="search" className="mb-10 flex flex-wrap gap-3">
+            <label className="min-w-[220px] flex-1">
+              <span className="sr-only">Search all books</span>
+              <input type="search" className="input" placeholder="Looking for something? Search every book" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={100} />
+            </label>
+            <button className="btn btn-primary">Search</button>
+          </form>
+        )}
+
+        {error && !list && (
+          <div className="alert-error flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <button className="btn btn-soft btn-sm" onClick={() => setAttempt((n) => n + 1)}>Try again</button>
+          </div>
+        )}
 
         {shelfIsEmpty ? (
           <div className="relative overflow-hidden rounded-[12px] border border-dashed border-neutral/60 px-6 py-16 text-center">
@@ -161,18 +212,20 @@ export default function Home() {
             <p className="mx-auto mt-3 max-w-md text-on-surface-muted">Nobody has published here yet. The first book in the catalog could be yours.</p>
             <Link href={publishHref} className="btn btn-primary mt-7">Publish the first book</Link>
           </div>
+        ) : !list ? (
+          !error && <BookGridSkeleton count={perPage} />
         ) : (
-          <InfiniteBookGrid
-            state={catalog}
-            render={(b, i) => <BookCard key={b.id} book={b} index={i} />}
-            empty={
-              <div className="note mx-auto max-w-md -rotate-1 text-center">
-                <p className="headline-sm">No books match that</p>
-                <p className="mt-2 text-sm">Try fewer words, or widen the price range.</p>
-                <button className="btn btn-soft mt-5" onClick={clearFilters}>Clear the filters</button>
-              </div>
-            }
-          />
+          <>
+            {error && <div className="alert-error mb-6">{error}</div>}
+            <div className={`grid grid-cols-2 gap-x-6 gap-y-14 transition-opacity md:grid-cols-4 md:gap-x-8 lg:gap-x-10 ${loading ? "opacity-50" : ""}`} aria-busy={loading}>
+              {list.books.map((b, i) => <BookCard key={b.id} book={b} index={(page - 1) * perPage + i} />)}
+            </div>
+            <Pager page={page} pages={pages} onPage={goToPage} disabled={loading} />
+            <div className="mt-10 text-center">
+              <Link href="/books" className="btn btn-primary">Browse all books</Link>
+              <p className="mt-3 text-sm text-on-surface-muted">Search every book, sort by price or title, and filter by price.</p>
+            </div>
+          </>
         )}
       </section>
 

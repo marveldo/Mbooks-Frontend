@@ -63,12 +63,15 @@ On the backend, set `PAYSTACK_SECRET_KEY`, and in the Paystack dashboard point t
 
 ## Catalog, library and infinite scroll
 
-- **Catalog** (home page, `#catalog`): `GET /books` with search (`q`, title or author), sort and a naira price range. Typing is applied 300 ms after the last keystroke.
+- **All books** (`/books`, public): `GET /books` with search (`q`, title or author), sort and a naira price range. Typing is applied 300 ms after the last keystroke.
+  - The filters live in the address, e.g. `/books?q=ink&min_price=1000&sort=title`, so a search can be shared or bookmarked. Updates use `router.replace`, so typing doesn't fill up the Back history.
+  - Reached from the landing page: the hero's *Browse the catalog*, the *Browse all books* button under "New on the shelves", and that section's search box. It's not in the navbar.
+- **Landing page, "New on the shelves":** the newest books, two rows at a time (8 per page from tablet width up, 4 on phones), with numbered pages (`Pager`: ← Previous · 1 … 4 5 6 … 12 · Next →). Its search box opens `/books?q=…`.
 - **My library** (`/library`): `GET /me/books` with the same filters plus a shelf: *All my books*, *Bought* or *Written by me*. Books you wrote get a *Written by you* badge and an *Open builder* link.
 - **My studio** (`/studio`): the *Written* shelf, opening the builder.
 - **Access checks:** the book page and the reader call `GET /me/books/{id}` (`api.inLibrary`), so they no longer download the whole library.
 
-All three lists use `useInfiniteBooks` (`src/lib/useInfiniteBooks.ts`) and `InfiniteBookGrid`:
+`/books`, the library and the studio use `useInfiniteBooks` (`src/lib/useInfiniteBooks.ts`) and `InfiniteBookGrid`:
 - page 1 loads first, and the next page loads when the end of the grid comes within 800px of the screen;
 - loading stops when the API says `has_more: false`;
 - changing a filter starts again from page 1, and answers for older filters are thrown away;

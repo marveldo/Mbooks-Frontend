@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Logo } from "./Logo";
 
 const cols = [
-  { title: "Browse", links: [["Catalog", "/"], ["My studio", "/studio"]] },
+  { title: "Browse", links: [["All books", "/books"], ["My library", "/library"], ["My studio", "/studio"]] },
   { title: "Write", links: [["Publish a book", "/books/new"], ["Create an account", "/signup"], ["Log in", "/login"]] },
 ];
 
