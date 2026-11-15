@@ -46,11 +46,14 @@ export const callbackUrl = () => `${window.location.origin}/payments/callback`;
 
 /**
  * Starts a Paystack checkout for the order (or reuses the one that's still open) and leaves the
- * site for Paystack's payment page. Paystack then sends the customer to /payments/callback.
+ * site for Paystack's payment page; Paystack then sends the customer to /payments/callback.
+ * A free book needs no checkout: it's added to the library at once and this returns "claimed".
  */
-export async function goToCheckout(orderId: string): Promise<void> {
+export async function goToCheckout(orderId: string): Promise<"claimed" | "redirecting"> {
   const checkout = await api.payOrder(orderId, callbackUrl());
+  if (checkout.status === "success" || !checkout.authorization_url) return "claimed";
   window.location.assign(checkout.authorization_url);
+  return "redirecting";
 }
 
 export const STATUS: Record<PaymentStatus, { label: string; chip: string; note: string }> = {

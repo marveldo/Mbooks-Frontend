@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatPrice, type Book } from "@/lib/api";
+import { priceLabel, type Book } from "@/lib/api";
 import { BookCover } from "./BookCover";
 
 export function BookCard({ book, href, badge, index }: { book: Book; href?: string; badge?: string; index?: number }) {
@@ -21,7 +21,7 @@ export function BookCard({ book, href, badge, index }: { book: Book; href?: stri
         <h3 className="font-display text-xl leading-snug font-medium text-on-surface decoration-primary decoration-2 underline-offset-4 group-hover:underline">{book.title}</h3>
       </div>
       <p className="mt-1 text-sm font-semibold text-on-surface-muted">{book.author}</p>
-      <p className="mt-2 font-bold">{formatPrice(book.price)}</p>
+      <p className="mt-2 font-bold">{priceLabel(book.price)}</p>
     </Link>
   );
 }

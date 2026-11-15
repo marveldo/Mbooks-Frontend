@@ -73,7 +73,7 @@ function Callback() {
     if (!payment) return;
     setPaying(true);
     try {
-      await goToCheckout(payment.order_id);
+      if ((await goToCheckout(payment.order_id)) === "claimed") { setPaying(false); window.location.assign("/library"); }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't open the payment page.");
       setPaying(false);

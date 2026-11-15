@@ -21,7 +21,12 @@ function Orders() {
   async function pay(o: Order) {
     setBusy(o.id);
     try {
-      await goToCheckout(o.id);
+      if ((await goToCheckout(o.id)) === "claimed") {
+        toast.success("Added to your library", "It was free, so there was nothing to pay.");
+        await load();
+        setBusy(null);
+        return;
+      }
       setLeaving(true); // the page is unloading; keep the button disabled
     } catch (e) {
       toast.error("Couldn't open the payment page", e instanceof ApiError ? (e.status === 409 ? "This order has already been paid." : e.message) : undefined);

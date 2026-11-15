@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api, ApiError, formatPrice, type Book } from "@/lib/api";
+import { api, ApiError, priceLabel, type Book } from "@/lib/api";
+import { goToCheckout } from "@/lib/purchases";
 import { canEdit, useAuth } from "@/lib/auth";
 import { BookCover } from "@/components/BookCover";
 import { Comments } from "@/components/Comments";
@@ -30,6 +31,20 @@ export default function BookPage() {
     if (!book) return;
     if (!user) { router.push(`/login?next=${encodeURIComponent(`/books/${book.id}`)}`); return; }
     setBuying(true);
+    if (book.price === 0) {
+      // Free: no order page, no Paystack. Claim it and it's in the library.
+      try {
+        const order = await api.createOrder(book.id, 1);
+        await goToCheckout(order.id);
+        setOwned(true);
+        toast.success("Added to your library", `“${book.title}” is yours to read.`);
+      } catch (e) {
+        toast.error("Couldn't add the book", e instanceof ApiError ? e.message : undefined);
+      } finally {
+        setBuying(false);
+      }
+      return;
+    }
     try {
       await api.createOrder(book.id, qty);
       toast.success("Order placed", "Pay for it to add the book to your library.");
@@ -64,7 +79,7 @@ export default function BookPage() {
 
           <div className="card mt-8 md:max-w-md">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <span className="font-display text-[32px] leading-none font-medium">{formatPrice(book.price * (mine || owned ? 1 : qty))}</span>
+              <span className="font-display text-[32px] leading-none font-medium">{priceLabel(book.price * (mine || owned ? 1 : qty))}</span>
               {mine ? (
                 <div className="flex flex-wrap gap-3">
                   <Link href={`/books/${book.id}/read`} className="btn btn-soft">Read</Link>
@@ -77,16 +92,24 @@ export default function BookPage() {
                 </div>
               ) : (
                 <div className="flex items-center gap-3">
-                  <div className="flex h-12 items-center rounded-[8px] border border-outline" role="group" aria-label="Copies">
+                  {book.price > 0 && <div className="flex h-12 items-center rounded-[8px] border border-outline" role="group" aria-label="Copies">
                     <button className="h-full w-10 text-xl font-bold disabled:opacity-30" disabled={qty <= 1} onClick={() => setQty((q) => q - 1)} aria-label="One fewer">−</button>
                     <span className="w-8 text-center font-bold tabular-nums" aria-live="polite">{qty}</span>
                     <button className="h-full w-10 text-xl font-bold disabled:opacity-30" disabled={qty >= 100} onClick={() => setQty((q) => q + 1)} aria-label="One more">+</button>
-                  </div>
-                  <button className="btn btn-primary" disabled={buying} onClick={buy}>{buying ? "Placing order…" : user ? "Buy now" : "Log in to buy"}</button>
+                  </div>}
+                  {book.price === 0 ? (
+                    <button className="btn btn-primary" disabled={buying} onClick={buy}>{buying ? "Adding…" : user ? "Get it free" : "Log in to get it free"}</button>
+                  ) : (
+                    <button className="btn btn-primary" disabled={buying} onClick={buy}>{buying ? "Placing order…" : user ? "Buy now" : "Log in to buy"}</button>
+                  )}
                 </div>
               )}
             </div>
-            {!mine && !owned && <p className="hint">You&apos;ll pay on the next screen. Once paid, the book stays in your library.</p>}
+            {!mine && !owned && (
+              <p className="hint">
+                {book.price === 0 ? "It's free: it goes straight into your library." : "You'll pay on the next screen. Once paid, the book stays in your library."}
+              </p>
+            )}
           </div>
 
           {book.description && (

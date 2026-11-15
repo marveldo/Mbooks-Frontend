@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatDateTime, formatPrice } from "@/lib/api";
+import { formatDateTime, formatPrice, isFreeReference } from "@/lib/api";
 import { isRefund, loadPurchases, ref, STATUS, type Purchases } from "@/lib/purchases";
 import { useAuth } from "@/lib/auth";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -76,7 +76,8 @@ function Payments() {
                     <p className="text-sm text-on-surface-muted">
                       {order ? `${order.quantity} ${order.quantity === 1 ? "copy" : "copies"} · ` : ""}Order {ref(p.order_id)}{when ? ` · ${when}` : ""}
                     </p>
-                    {p.reference && <p className="text-xs break-all text-on-surface-muted">Paystack ref {p.reference}</p>}
+                    {p.reference && !isFreeReference(p.reference) && <p className="text-xs break-all text-on-surface-muted">Paystack ref {p.reference}</p>}
+                    {isFreeReference(p.reference) && <p className="text-xs text-on-surface-muted">Free book</p>}
                     <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-on-surface-muted">
                       <span className={status.chip}>{status.label}</span>
                       {p.status === "pending" && p.reference ? (

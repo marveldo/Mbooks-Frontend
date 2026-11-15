@@ -184,11 +184,14 @@ export interface Payment {
   paid_at: string | null;
 }
 
-/** POST /orders/{id}/pay: send the customer to `authorization_url`. */
+/**
+ * POST /orders/{id}/pay. `pending`: send the customer to `authorization_url` (Paystack).
+ * `success`: the book was free, it's already in the library and there's nothing to pay.
+ */
 export interface Checkout {
   reference: string;
-  authorization_url: string;
-  status: "pending";
+  authorization_url: string | null;
+  status: "pending" | "success";
 }
 
 export type Theme = "light" | "dark" | "system";
@@ -421,6 +424,14 @@ export function formatDateTime(value: string | null | undefined) {
   const d = new Date(/([zZ]|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`);
   return Number.isNaN(d.getTime()) ? value : new Intl.DateTimeFormat("en-NG", { dateStyle: "medium", timeStyle: "short" }).format(d);
 }
+
+/** A book's price for display: "Free" for ₦0. */
+export function priceLabel(n: number) {
+  return n === 0 ? "Free" : formatPrice(n);
+}
+
+/** Free books get a "free_…" reference instead of a Paystack one. */
+export const isFreeReference = (reference: string | null) => !!reference?.startsWith("free_");
 
 export function formatPrice(n: number) {
   return new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN", maximumFractionDigits: 2 }).format(n);

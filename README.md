@@ -44,6 +44,8 @@ Buying a book goes through Paystack. The browser never sees the Paystack secret 
 3. **Back from Paystack:** Paystack sends the customer to `/payments/callback?reference=…`. That page calls `POST /payments/{reference}/verify`, which asks Paystack and returns the payment. While it's `pending` the page asks again every 3 seconds for about a minute, then offers *Check again*.
 4. **Safety nets (backend only):** Paystack's webhook and a scheduled check confirm payments even if the customer closes the tab, so a book can appear in the library without the callback page ever loading.
 
+**Free books (₦0):** Paystack won't take a zero amount, so the book page shows *Get it free*. It creates an order and calls `POST /orders/{id}/pay`, which answers `status: "success"` with no `authorization_url`, and the book goes straight into the library. Prices show as "Free" (`priceLabel`), and the payment's reference starts with `free_` (shown as "Free book").
+
 Payment statuses (`Payment.status` in `src/lib/api.ts`; labels in `STATUS` in `src/lib/purchases.ts`):
 
 | Status | Meaning | What the UI offers |
