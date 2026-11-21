@@ -113,6 +113,12 @@ export interface PageImageSignature extends CoverSignature {
   url: string;
 }
 
+export interface PdfUploadTicket {
+  upload_url: string;
+  max_bytes: number;
+  expires_in: number;
+}
+
 export interface PdfUploadAccepted {
   job_id: string;
   book_id: string;
@@ -252,11 +258,15 @@ async function request<T>(method: Method, path: string, body?: unknown, base = "
     throw new ApiError(0, "Couldn't reach the server. Check your connection and try again.");
   }
 
+  return readResponse<T>(res, true);
+}
+
+async function readResponse<T>(res: Response, signalUnauthorized: boolean): Promise<T> {
   let json: { success?: boolean; data?: T; error?: { message: string; details?: FieldError[] } } | null = null;
   try { json = await res.json(); } catch { /* non-JSON body */ }
 
   if (!res.ok || !json || json.success === false) {
-    if (res.status === 401 && typeof window !== "undefined") {
+    if (signalUnauthorized && res.status === 401 && typeof window !== "undefined") {
       window.dispatchEvent(new Event("mbooks:unauthorized"));
     }
     const msg = json?.error?.message ?? (res.status === 413 ? "That file is too large." : `Request failed (${res.status})`);
@@ -349,10 +359,20 @@ export const api = {
     request<Comment>("PUT", `/books/${bookId}/comments/${commentId}`, { content }),
   deleteComment: (bookId: string, commentId: string) => request<null>("DELETE", `/books/${bookId}/comments/${commentId}`),
 
-  importPdf: (bookId: string, file: File) => {
+  importPdf: async (bookId: string, file: File) => {
+    const ticket = await request<PdfUploadTicket>("POST", `/books/${bookId}/pdf/ticket`);
+    if (file.size > ticket.max_bytes) {
+      throw new ApiError(413, `That PDF is too large. The limit is ${Math.floor(ticket.max_bytes / (1024 * 1024))} MB.`);
+    }
     const fd = new FormData();
     fd.append("file", file);
-    return request<PdfUploadAccepted>("POST", `/books/${bookId}/pdf`, fd);
+    let res: Response;
+    try {
+      res = await fetch(ticket.upload_url, { method: "POST", body: fd, cache: "no-store" });
+    } catch {
+      throw new ApiError(0, "Couldn't upload the PDF. Check your connection and try again.");
+    }
+    return readResponse<PdfUploadAccepted>(res, false);
   },
 };
 

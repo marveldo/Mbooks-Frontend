@@ -6,7 +6,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Proxies /api/v1/* to the backend, adding the bearer token from the httpOnly cookie.
- * (The backend also answers CORS preflights with 403, so the browser can't call it directly anyway.)
+ * (The backend also answers CORS preflights with 403, so the browser can't call it directly with a token.
+ * PDF uploads skip this proxy because Vercel caps function bodies at 4.5 MB: see importPdf in lib/api.ts.)
  *
  * Access tokens only last minutes. When ours has run out we swap the refresh token for a new pair
  * (POST /auth/refresh) before calling, or after a 401, and store the new pair on the way out, so
