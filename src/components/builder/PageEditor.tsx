@@ -7,10 +7,12 @@ import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import TextAlign from "@tiptap/extension-text-align";
 import Image from "@tiptap/extension-image";
+import Superscript from "@tiptap/extension-superscript";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, PAGE_IMAGE_TYPES, uploadPageImage } from "@/lib/api";
 import { useToast } from "@/components/Toast";
 import { parseDoc } from "./doc";
+import { Footnotes } from "./Footnotes";
 
 interface Props {
   bookId: string;
@@ -58,6 +60,8 @@ export function PageEditor({ bookId, content, onChange }: Props) {
       Link.configure({ openOnClick: false, autolink: true }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Image,
+      Superscript,
+      Footnotes,
       Placeholder.configure({ placeholder: "Start writing this page…" }),
     ],
     content: parseDoc(content),

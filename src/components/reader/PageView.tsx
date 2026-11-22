@@ -57,6 +57,8 @@ function render(node: JSONContent): ReactNode {
       return <blockquote>{kids(node)}</blockquote>;
     case "codeBlock":
       return <pre><code>{kids(node)}</code></pre>;
+    case "footnotes":
+      return <aside className="footnotes">{kids(node)}</aside>;
     case "horizontalRule":
       return <hr />;
     case "hardBreak":
@@ -83,6 +85,7 @@ function marked(node: JSONContent): ReactNode {
       case "underline": out = <u>{out}</u>; break;
       case "strike": out = <s>{out}</s>; break;
       case "code": out = <code>{out}</code>; break;
+      case "superscript": out = <sup>{out}</sup>; break;
       case "link": {
         const href = safeUrl(mark.attrs?.href);
         if (href) out = <a href={href} target="_blank" rel="noopener noreferrer nofollow">{out}</a>;
